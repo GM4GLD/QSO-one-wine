@@ -1,0 +1,7 @@
+LIBRARY mf.dll
+EXPORTS
+    MFEnumDeviceSources
+    MFCreateDeviceSource
+    MFCreateDeviceSourceActivate
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE
