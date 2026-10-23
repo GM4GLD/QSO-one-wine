@@ -21,6 +21,13 @@ curl -fsSL https://raw.githubusercontent.com/GM4GLD/QSO-one-wine/main/install.sh
 
 The steps below show the same process manually, for reference.
 
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/GM4GLD/QSO-one-wine ~/QSO-one-wine
+cd ~/QSO-one-wine
+```
+
 ### 2. Copy the DLLs into QSO One's installation directory
 
 The DLLs must go next to `qso_one.exe`. The install location varies —
@@ -139,3 +146,4 @@ Run it inside the Wine prefix with a test audio signal playing.
 - **Notifications:** toast notifications are disabled, including the microphone-active notification.
 - **Audio:** the shim supports the PCM capture path required for transmit audio. It does not implement encoder transforms required by some file-recording formats.
 - **Compatibility:** verified on Arch Linux (Wine 11.20, PipeWire) and Debian 13 trixie (Wine 10.0 — requires `icu.dll` from this repo), with QSO One 4.1.665.0 and 4.1.8 (build 673). Other configurations have not been independently tested.
+
