@@ -42,7 +42,21 @@ cp notif-stub/flutter_local_notifications_windows.dll "$APP/"
 
 The first command backs up the original notification plugin. If you have already renamed it to `.disabled`, skip that command.
 
-### 3. Launch QSO One
+### 3. Optional — Wine older than 11.x: copy `icu.dll`
+
+`flutter_timezone_plugin.dll` imports `icu.dll`, which Wine only ships
+in recent versions (missing on Debian's wine-10.0, for example). On
+Wine 11 or newer you can skip this step entirely. If you are on an
+older Wine, or see errors like `Library icu.dll ... not found`, copy
+it as well:
+
+```bash
+cp icu/icu.dll "$APP/"
+```
+
+It is Wine's own self-contained build of ICU — no Wine upgrade needed.
+
+### 4. Launch QSO One
 
 ```bash
 WINEPREFIX="$HOME/.wine" wine \
@@ -57,19 +71,6 @@ pactl list source-outputs
 
 Look for `application.name = "qso_one"`.
 
-### 4. Wine older than 11.x only: copy `icu.dll`
-
-`flutter_timezone_plugin.dll` imports `icu.dll`, which Wine only ships
-in recent versions (missing on Debian's wine-10.0, for example). If you
-see errors like `Library icu.dll ... not found`, copy it as well:
-
-```bash
-cp icu/icu.dll "$APP/"
-```
-
-It is Wine's own self-contained build of ICU — no Wine upgrade needed.
-On Wine 11 or newer you can skip this step.
-
 ### Reverting the changes
 
 Close QSO One and run:
@@ -78,6 +79,7 @@ Close QSO One and run:
 APP="$HOME/.wine/drive_c/Program Files/QSOone"
 
 rm -f "$APP/mf.dll"
+rm -f "$APP/icu.dll"
 rm -f "$APP/flutter_local_notifications_windows.dll"
 mv "$APP/flutter_local_notifications_windows.dll.disabled" \
    "$APP/flutter_local_notifications_windows.dll"
