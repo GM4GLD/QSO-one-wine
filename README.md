@@ -9,13 +9,17 @@ Workarounds for two Wine compatibility issues affecting QSO One, a Flutter appli
 - **Microphone:** restores transmit audio by providing Media Foundation capture through WASAPI.
 - **Notifications:** prevents crashes caused by Wine's incomplete WinRT toast notification support. Desktop toast notifications are disabled as a trade-off.
 
-## Installation (precompiled DLLs)
+## Installation
 
-No compilation is required. The repository includes the compiled DLLs.
+Run this one-liner in a terminal — it finds your QSO One install,
+downloads the DLLs from this repository, and restores them. Re-run it
+after every QSO One update:
 
-### 1. Download the DLLs
+```bash
+curl -fsSL https://raw.githubusercontent.com/GM4GLD/QSO-one-wine/main/install.sh | sh
+```
 
-Download or clone this repository so you have the `mf-shim/` and `notif-stub/` directories.
+The steps below show the same process manually, for reference.
 
 ### 2. Copy the DLLs into QSO One's installation directory
 
