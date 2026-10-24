@@ -8,6 +8,7 @@ Workarounds for two Wine compatibility issues affecting QSO One, a Flutter appli
 
 - **Microphone:** restores transmit audio by providing Media Foundation capture through WASAPI.
 - **Notifications:** prevents crashes caused by Wine's incomplete WinRT toast notification support. Desktop toast notifications are disabled as a trade-off.
+- **Idle CPU (optional):** fixes ~60-70% of a core being burned at idle by launching the app with `TZ` set explicitly (see [High idle CPU](#high-idle-cpu-under-wine)).
 
 ## Installation
 
@@ -81,6 +82,48 @@ pactl list source-outputs
 ```
 
 Look for `application.name = "qso_one"`.
+
+## High idle CPU under Wine
+
+Symptom: QSO One holds ~60-70% of a CPU core while sitting idle.
+
+Cause: the app's timers and log timestamps perform `DateTime` local-time
+conversions many times per second. On Windows each call is effectively free;
+under Wine every call becomes a wineserver RPC round-trip — registry
+open/query/close on `Time Zones\<zone>`, `tzres.dll` loads, and repeated
+`/etc/localtime` stats — hundreds of syscalls per second.
+
+Workaround: launch the app with `TZ` set to your local zone. This makes
+glibc cache the timezone once instead of re-statting `/etc/localtime` per
+call. (The wineserver registry RPC side is an app-level cost; setting
+`TZ` still removes the largest share of the burn.)
+
+### 1-click install (creates a separate launcher)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/GM4GLD/QSO-one-wine/main/tzfix.sh | sh
+```
+
+This finds your QSO One install and your local timezone, then writes
+`~/.local/share/applications/qso-one-fixed.desktop` — a **"QSO One (TZ
+fixed)"** menu entry that launches the app with `TZ` set.
+
+It is safe from updates: Wine only auto-regenerates launchers inside
+`~/.local/share/applications/wine/`, so this file is never overwritten.
+Your original "QSO One" entry is untouched; use either.
+
+### Manual equivalent
+
+Add a desktop entry yourself, or launch from a terminal:
+
+```bash
+WINEPREFIX="$HOME/.wine" TZ='Europe/London' wine \
+    "$HOME/.wine/drive_c/Program Files/QSO One/qso_one.exe"
+```
+
+(Substitute your own IANA zone for `Europe/London`.)
+
+To remove the fix: `rm ~/.local/share/applications/qso-one-fixed.desktop`
 
 ### Reverting the changes
 
