@@ -12,6 +12,10 @@ Workarounds for two Wine compatibility issues affecting QSO One, a Flutter appli
 
 ## Installation
 
+**Prerequisite:** QSO One must already be installed under Wine. If it
+isn't, download the Windows installer from the QSO One website and run
+it with Wine (e.g. `wine ~/Downloads/<installer-file>.exe`) first.
+
 Run this one-liner in a terminal — it finds your QSO One install,
 downloads the DLLs from this repository, and restores them. Re-run it
 after every QSO One update:
