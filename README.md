@@ -2,7 +2,7 @@
 
 Workarounds for two Wine compatibility issues affecting QSO One, a Flutter application, on Linux.
 
-**Verified working:** QSO One 4.1.665.0 and 4.1.8 (build 673), tested on Arch Linux (Wine 11.20, PipeWire) and Debian 13 trixie (Wine 10.0, `icu.dll` required — see step 4).
+**Verified working:** QSO One 4.1.665.0 and 4.1.8 (build 673), tested on Arch Linux (Wine 11.20, PipeWire) and Debian 13 trixie (Wine 10.0, `icu.dll` required — see step 3).
 
 ## What this fixes
 
