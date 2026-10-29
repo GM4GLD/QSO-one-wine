@@ -2,7 +2,7 @@
 
 Workarounds for two Wine compatibility issues affecting QSO One, a Flutter application, on Linux.
 
-**Verified working:** QSO One 4.1.665.0 and 4.1.8 (build 673), tested on Arch Linux (Wine 11.20, PipeWire) and Debian 13 trixie (Wine 10.0, `icu.dll` required — see step 3).
+**Verified working:** QSO One 4.1.665.0, 4.1.8 (build 673), and 4.2.2, tested on Arch Linux (Wine 11.20, PipeWire) and Debian 13 trixie (Wine 10.0, `icu.dll` required — see step 3).
 
 ## What this fixes
 
@@ -23,6 +23,10 @@ after every QSO One update:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/GM4GLD/QSO-one-wine/main/install.sh | sh
 ```
+
+**QSO One 4.2.2:** confirmed working after manually installing the
+new installer `.exe` from the QSO One website, then running the
+one-liner above again.
 
 The steps below show the same process manually, for reference.
 
@@ -192,5 +196,5 @@ Run it inside the Wine prefix with a test audio signal playing.
 - **Updates:** QSO One updates may overwrite the replacement DLLs. Copy them back if necessary.
 - **Notifications:** toast notifications are disabled, including the microphone-active notification.
 - **Audio:** the shim supports the PCM capture path required for transmit audio. It does not implement encoder transforms required by some file-recording formats.
-- **Compatibility:** verified on Arch Linux (Wine 11.20, PipeWire) and Debian 13 trixie (Wine 10.0 — requires `icu.dll` from this repo), with QSO One 4.1.665.0 and 4.1.8 (build 673). Other configurations have not been independently tested.
+- **Compatibility:** verified on Arch Linux (Wine 11.20, PipeWire) and Debian 13 trixie (Wine 10.0 — requires `icu.dll` from this repo), with QSO One 4.1.665.0, 4.1.8 (build 673), and 4.2.2. Other configurations have not been independently tested.
 
