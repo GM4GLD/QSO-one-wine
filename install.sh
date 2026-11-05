@@ -1,11 +1,21 @@
 #!/bin/sh
-# QSO One Wine fixes installer.
+# QSO One Wine fixes installer — everything in one step.
 #
 #   curl -fsSL https://raw.githubusercontent.com/GM4GLD/QSO-one-wine/main/install.sh | sh
 #
-# Finds the QSO One install directory, downloads the workaround DLLs
-# from this repository, and places them next to qso_one.exe.
-# Safe to run again after every QSO One update.
+# Run after installing (or updating) QSO One under Wine. It:
+#   * installs mf.dll next to qso_one.exe (microphone fix)
+#   * replaces flutter_local_notifications_windows.dll with a stub
+#     (crash fix; the original is backed up as .disabled)
+#   * installs icu.dll (needed by flutter_timezone_plugin.dll on Wine
+#     builds that don't ship it — harmless where Wine already does)
+#   * writes a "QSO One (TZ fixed)" menu launcher that starts the app
+#     with TZ set (works around ~60-70% idle CPU burn under Wine)
+#   * hides the Wine-generated "QSO One" menu entry so only the
+#     TZ-fixed launcher appears
+#
+# Every QSO One install directory found (including per-user installs
+# under drive_c/users/*) gets the DLLs. Re-run after every update.
 
 set -e
 REPO="${QSO_WINE_REPO:-https://raw.githubusercontent.com/GM4GLD/QSO-one-wine/main}"
@@ -24,9 +34,13 @@ is_app_dir() {
   { [ -f "$1/flutter_windows.dll" ] || [ -d "$1/data" ]; }
 }
 
-APP=""
-try_dir() {
-  if [ -z "$APP" ] && is_app_dir "$1"; then APP="$1"; fi
+# Newline-separated list of every install dir found.
+APP_DIRS=""
+add_dir() {
+  is_app_dir "$1" || return 0
+  printf '%s\n' "$APP_DIRS" | grep -qxF "$1" && return 0
+  APP_DIRS="${APP_DIRS:+$APP_DIRS
+}$1"
 }
 
 # Check drive_c of every likely Wine prefix, in the places installers put it.
@@ -41,24 +55,27 @@ do
   for sub in \
     "Program Files/QSO One" \
     "Program Files/QSOOne" \
+    "Program Files/QSOone" \
     "Program Files (x86)/QSO One" \
-    "Program Files (x86)/QSOOne"
+    "Program Files (x86)/QSOOne" \
+    "Program Files (x86)/QSOone"
   do
-    try_dir "$base/drive_c/$sub"
+    add_dir "$base/drive_c/$sub"
   done
   # Per-user installs land under %LOCALAPPDATA%\Programs.
   for progs in "$base"/drive_c/users/*/AppData/Local/Programs; do
     [ -d "$progs" ] || continue
-    try_dir "$progs/QSO One"
-    try_dir "$progs/QSOOne"
+    add_dir "$progs/QSO One"
+    add_dir "$progs/QSOOne"
+    add_dir "$progs/QSOone"
   done
 done
 
-# Fall back to a full search of the home directory (also finds portable or
+# Fall back to a search of the home directory (also finds portable or
 # extracted copies). Only directories that look like a real install count.
-if [ -z "$APP" ]; then
+if [ -z "$APP_DIRS" ]; then
   echo "install.sh: searching for qso_one.exe under $HOME ..."
-  APP="$(
+  APP_DIRS="$(
     find "$HOME" -maxdepth 12 -iname qso_one.exe 2>/dev/null |
     while IFS= read -r exe; do
       d="$(dirname "$exe")"
@@ -69,11 +86,11 @@ fi
 
 # Last resort: ask for the path; an empty answer means QSO One is not
 # installed yet, so explain that and stop.
-if [ -z "$APP" ]; then
+if [ -z "$APP_DIRS" ]; then
   echo "install.sh: could not find an installed copy of QSO One."
   printf "Enter the folder containing qso_one.exe, or press Enter to abort: "
-  read -r APP 2>/dev/null < /dev/tty || APP=""
-  if [ -z "$APP" ]; then
+  read -r APP_DIRS 2>/dev/null < /dev/tty || APP_DIRS=""
+  if [ -z "$APP_DIRS" ]; then
     cat <<'EOF'
 
 QSO One must be installed under Wine before running this script:
@@ -85,34 +102,89 @@ EOF
   fi
 fi
 
-is_app_dir "$APP" || {
-  echo "install.sh: '$APP' does not look like a QSO One installation" >&2
+# Sanity-check every dir we're about to touch.
+printf '%s\n' "$APP_DIRS" | while IFS= read -r d; do
+  is_app_dir "$d" && continue
+  echo "install.sh: '$d' does not look like a QSO One installation" >&2
   echo "  (expected qso_one.exe plus flutter_windows.dll/data in that folder)" >&2
   exit 1
-}
-echo "install.sh: installing to $APP"
+done
 
 DL="$(mktemp -d)"
-
-curl -fsSL "$REPO/mf-shim/mf.dll" -o "$APP/mf.dll"
-echo "  installed mf.dll                 (microphone fix)"
-
-NOTIF="$APP/flutter_local_notifications_windows.dll"
 curl -fsSL "$REPO/notif-stub/flutter_local_notifications_windows.dll" -o "$DL/fln.dll"
-if [ -f "$NOTIF" ] && ! cmp -s "$NOTIF" "$DL/fln.dll" && [ ! -f "$NOTIF.disabled" ]; then
-  mv "$NOTIF" "$NOTIF.disabled"
-  echo "  backed up original plugin ->     flutter_local_notifications_windows.dll.disabled"
-fi
-cp "$DL/fln.dll" "$NOTIF"
-echo "  installed flutter_local_notifications_windows.dll (notification crash fix)"
 
-MAJOR="$(wine --version 2>/dev/null | sed -n 's/^wine-\([0-9][0-9]*\).*/\1/p')"
-if [ -z "$MAJOR" ] || [ "$MAJOR" -lt 11 ]; then
+printf '%s\n' "$APP_DIRS" | while IFS= read -r APP; do
+  [ -n "$APP" ] || continue
+  echo "install.sh: installing to $APP"
+
+  curl -fsSL "$REPO/mf-shim/mf.dll" -o "$APP/mf.dll"
+  echo "  installed mf.dll                            (microphone fix)"
+
+  NOTIF="$APP/flutter_local_notifications_windows.dll"
+  if [ -f "$NOTIF" ] && ! cmp -s "$NOTIF" "$DL/fln.dll" && [ ! -f "$NOTIF.disabled" ]; then
+    mv "$NOTIF" "$NOTIF.disabled"
+    echo "  backed up original plugin -> flutter_local_notifications_windows.dll.disabled"
+  fi
+  cp "$DL/fln.dll" "$NOTIF"
+  echo "  installed flutter_local_notifications_windows.dll (notification crash fix)"
+
   curl -fsSL "$REPO/icu/icu.dll" -o "$APP/icu.dll"
-  echo "  installed icu.dll                (timezone plugin, Wine < 11)"
-else
-  echo "  wine-$MAJOR detected: icu.dll not needed, skipped"
-fi
-
+  echo "  installed icu.dll                           (timezone plugin support)"
+done
 rm -rf "$DL"
-echo "install.sh: done."
+
+# --- TZ launcher ---------------------------------------------------------
+
+# Use the first install dir found for the launcher and prefix detection.
+APP="$(printf '%s\n' "$APP_DIRS" | sed -n '1p')"
+
+# Derive the Wine prefix from the app path (drive_c parent); default ~/.wine.
+case "$APP" in
+  */drive_c/*) PREFIX="${APP%%/drive_c/*}" ;;
+  *)           PREFIX="$HOME/.wine" ;;
+esac
+
+# Detect the local IANA timezone name.
+TZ=""
+if [ -L /etc/localtime ]; then
+  TZ="$(readlink /etc/localtime | sed -n 's|.*/zoneinfo/||p')"
+fi
+if [ -z "$TZ" ] && command -v timedatectl >/dev/null 2>&1; then
+  TZ="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+fi
+[ -z "$TZ" ] && TZ="UTC0"
+
+DESKTOP_DIR="$HOME/.local/share/applications"
+DESKTOP="$DESKTOP_DIR/qso-one-fixed.desktop"
+mkdir -p "$DESKTOP_DIR"
+
+cat > "$DESKTOP" <<EOF
+[Desktop Entry]
+Name=QSO One (TZ fixed)
+Comment=QSO One with TZ=$TZ to avoid Wine timezone syscall storm
+Exec=env "WINEPREFIX=$PREFIX" "TZ=$TZ" wine "$APP/qso_one.exe"
+Type=Application
+StartupNotify=true
+Path=$APP/data
+Icon=8915_qso_one.0
+StartupWMClass=qso_one.exe
+EOF
+echo "install.sh: wrote $DESKTOP (TZ=$TZ, prefix=$PREFIX)"
+
+# Hide Wine-generated "QSO One" entries so only the TZ-fixed launcher
+# appears in the menu. Hidden=true makes the entry count as deleted;
+# Wine re-creates the file on updates, so re-run this script to re-hide.
+find "$DESKTOP_DIR" -type f -name '*.desktop' \
+  ! -name 'qso-one-fixed.desktop' 2>/dev/null |
+while IFS= read -r f; do
+  grep -qiE 'qso[ _-]*one' "$f" || continue
+  if grep -qE '^(Hidden|NoDisplay)=' "$f"; then
+    sed -i -e 's/^Hidden=.*/Hidden=true/' -e 's/^NoDisplay=.*/Hidden=true/' "$f"
+  else
+    sed -i '/^\[Desktop Entry\]/a Hidden=true' "$f"
+  fi
+  echo "install.sh: hid $f"
+done
+
+update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+echo "install.sh: done. Launch 'QSO One (TZ fixed)' from your menu."
