@@ -196,37 +196,18 @@ while IFS= read -r f; do
 done
 fi
 
-# Register qsoone:// so "open in QSO One" links on the website hand off
-# to the app under Wine. QSO One registers the scheme inside the prefix
-# and `wine start` resolves it there. Wine also generates
-# wine-protocol-qsoone.desktop, but nothing makes it the default
-# handler — so we ship our own (which also gets the TZ fix) and set it.
-cat > "$DESKTOP_DIR/qso-one-url.desktop" <<EOF
-[Desktop Entry]
-Type=Application
-Name=QSO One URL handler (Wine)
-Comment=Pass qsoone:// links to QSO One running under Wine
-Exec=env "WINEPREFIX=$PREFIX" "TZ=$TZ" wine start %u
-MimeType=x-scheme-handler/qsoone;
-NoDisplay=true
-EOF
-echo "install.sh: wrote $DESKTOP_DIR/qso-one-url.desktop (qsoone:// handler)"
-
-if command -v xdg-mime >/dev/null 2>&1; then
-  xdg-mime default qso-one-url.desktop x-scheme-handler/qsoone || true
-fi
-# Also write the association into mimeapps.list directly — covers setups
-# without xdg-mime and desktops that read a different file than the one
-# xdg-mime happens to write (e.g. ~/.config vs applications/).
-MIMEAPPS="$DESKTOP_DIR/mimeapps.list"
-touch "$MIMEAPPS"
-if grep -q '^x-scheme-handler/qsoone=' "$MIMEAPPS"; then
-  sed -i 's|^x-scheme-handler/qsoone=.*|x-scheme-handler/qsoone=qso-one-url.desktop|' "$MIMEAPPS"
-elif grep -q '^\[Default Applications\]' "$MIMEAPPS"; then
-  sed -i '/^\[Default Applications\]/a x-scheme-handler/qsoone=qso-one-url.desktop' "$MIMEAPPS"
-else
-  printf '[Default Applications]\nx-scheme-handler/qsoone=qso-one-url.desktop\n' >> "$MIMEAPPS"
-fi
+# Remove the qsoone:// handler installed by earlier versions of this
+# script — the website can't detect the app either way, so it was
+# reverted. Wine's own wine-protocol-qsoone.desktop continues to
+# handle qsoone:// links where it exists.
+rm -f "$DESKTOP_DIR/qso-one-url.desktop"
+for MIMEAPPS in \
+  "$DESKTOP_DIR/mimeapps.list" \
+  "${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list"
+do
+  [ -f "$MIMEAPPS" ] || continue
+  sed -i '/^x-scheme-handler\/qsoone=qso-one-url\.desktop/d' "$MIMEAPPS"
+done
 
 update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
 echo "install.sh: done. Launch 'QSO One (TZ fixed)' from your menu."

@@ -97,12 +97,5 @@ visible — or `qso_one.exe` in `Exec=`) because a `WINEPREFIX` path can
 itself be named `qso-one` and would otherwise false-positive on
 unrelated entries — including the `qsoone://` protocol handler, which
 must not be hidden.
-
-The installer also writes `applications/qso-one-url.desktop`
-(`x-scheme-handler/qsoone`, running `wine start %u` with the TZ fix)
-and sets it as the default handler via `xdg-mime` (or a manual
-`mimeapps.list` edit). Wine generates its own
-`wine-protocol-qsoone.desktop` for the scheme but never makes it the
-default, so browsers had no way to pass `qsoone://` links through.
 Wine re-creates those entries on updates, hence the instruction to
 re-run the installer after every update.
