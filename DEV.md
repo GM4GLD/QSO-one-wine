@@ -89,7 +89,12 @@ burn.)
 The launcher lives at `~/.local/share/applications/qso-one-fixed.desktop`
 — outside `~/.local/share/applications/wine/`, which Wine regenerates
 from `.lnk` files — so app updates cannot overwrite it. The installer
-adds `Hidden=true` to the Wine-generated "QSO One" entries, which makes
-them count as deleted so only the TZ-fixed launcher appears in menus.
+adds `Hidden=true` to the Wine-generated "QSO One" entries under
+`applications/wine/`, which makes them count as deleted so only the
+TZ-fixed launcher appears in menus. Matching is deliberately narrow
+(`Name=` containing "QSO One", or `qso_one.exe` in `Exec=`) because a
+`WINEPREFIX` path can itself be named `qso-one` and would otherwise
+false-positive on unrelated entries — including the `qsoone://`
+protocol handler, which must not be hidden.
 Wine re-creates those entries on updates, hence the instruction to
 re-run the installer after every update.

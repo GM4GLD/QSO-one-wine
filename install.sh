@@ -171,13 +171,22 @@ StartupWMClass=qso_one.exe
 EOF
 echo "install.sh: wrote $DESKTOP (TZ=$TZ, prefix=$PREFIX)"
 
-# Hide Wine-generated "QSO One" entries so only the TZ-fixed launcher
-# appears in the menu. Hidden=true makes the entry count as deleted;
-# Wine re-creates the file on updates, so re-run this script to re-hide.
-find "$DESKTOP_DIR" -type f -name '*.desktop' \
+# Hide Wine-generated "QSO One" entries (the app launcher and its
+# uninstaller) so only the TZ-fixed launcher appears in the menu.
+# Hidden=true makes an entry count as deleted; Wine re-creates these
+# files on updates, so re-run this script to re-hide.
+#
+# Only the applications/wine subtree is scanned — it holds the Start-Menu
+# launchers Wine regenerates from .lnk files. Top-level wine-* files
+# (file-association and protocol handlers such as qsoone://) must be
+# left alone. Match only the Name= field, or qso_one.exe in Exec= —
+# never whole-file content, since a WINEPREFIX path may itself be named
+# e.g. "qso-one" and produce false positives.
+if [ -d "$DESKTOP_DIR/wine" ]; then
+find "$DESKTOP_DIR/wine" -type f -name '*.desktop' \
   ! -name 'qso-one-fixed.desktop' 2>/dev/null |
 while IFS= read -r f; do
-  grep -qiE 'qso[ _-]*one' "$f" || continue
+  grep -qiE '^Name=.*qso[ _-]*one|^Exec=.*qso_one\.exe' "$f" || continue
   if grep -qE '^(Hidden|NoDisplay)=' "$f"; then
     sed -i -e 's/^Hidden=.*/Hidden=true/' -e 's/^NoDisplay=.*/Hidden=true/' "$f"
   else
@@ -185,6 +194,7 @@ while IFS= read -r f; do
   fi
   echo "install.sh: hid $f"
 done
+fi
 
 update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
 echo "install.sh: done. Launch 'QSO One (TZ fixed)' from your menu."
