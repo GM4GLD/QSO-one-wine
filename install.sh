@@ -171,22 +171,22 @@ StartupWMClass=qso_one.exe
 EOF
 echo "install.sh: wrote $DESKTOP (TZ=$TZ, prefix=$PREFIX)"
 
-# Hide Wine-generated "QSO One" entries (the app launcher and its
-# uninstaller) so only the TZ-fixed launcher appears in the menu.
-# Hidden=true makes an entry count as deleted; Wine re-creates these
-# files on updates, so re-run this script to re-hide.
+# Hide the Wine-generated "QSO One" launcher so only the TZ-fixed
+# launcher appears in the menu (the "Uninstall QSO One" entry is left
+# alone). Hidden=true makes an entry count as deleted; Wine re-creates
+# these files on updates, so re-run this script to re-hide.
 #
 # Only the applications/wine subtree is scanned — it holds the Start-Menu
 # launchers Wine regenerates from .lnk files. Top-level wine-* files
 # (file-association and protocol handlers such as qsoone://) must be
-# left alone. Match only the Name= field, or qso_one.exe in Exec= —
-# never whole-file content, since a WINEPREFIX path may itself be named
-# e.g. "qso-one" and produce false positives.
+# left alone. Match only a Name= of exactly "QSO One", or qso_one.exe
+# in Exec= — never whole-file content, since a WINEPREFIX path may
+# itself be named e.g. "qso-one" and produce false positives.
 if [ -d "$DESKTOP_DIR/wine" ]; then
 find "$DESKTOP_DIR/wine" -type f -name '*.desktop' \
   ! -name 'qso-one-fixed.desktop' 2>/dev/null |
 while IFS= read -r f; do
-  grep -qiE '^Name=.*qso[ _-]*one|^Exec=.*qso_one\.exe' "$f" || continue
+  grep -qiE '^Name=[[:space:]]*qso[ _-]*one[[:space:]]*$|^Exec=.*qso_one\.exe' "$f" || continue
   if grep -qE '^(Hidden|NoDisplay)=' "$f"; then
     sed -i -e 's/^Hidden=.*/Hidden=true/' -e 's/^NoDisplay=.*/Hidden=true/' "$f"
   else
@@ -194,6 +194,38 @@ while IFS= read -r f; do
   fi
   echo "install.sh: hid $f"
 done
+fi
+
+# Register qsoone:// so "open in QSO One" links on the website hand off
+# to the app under Wine. QSO One registers the scheme inside the prefix
+# and `wine start` resolves it there. Wine also generates
+# wine-protocol-qsoone.desktop, but nothing makes it the default
+# handler — so we ship our own (which also gets the TZ fix) and set it.
+cat > "$DESKTOP_DIR/qso-one-url.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=QSO One URL handler (Wine)
+Comment=Pass qsoone:// links to QSO One running under Wine
+Exec=env "WINEPREFIX=$PREFIX" "TZ=$TZ" wine start %u
+MimeType=x-scheme-handler/qsoone;
+NoDisplay=true
+EOF
+echo "install.sh: wrote $DESKTOP_DIR/qso-one-url.desktop (qsoone:// handler)"
+
+if command -v xdg-mime >/dev/null 2>&1; then
+  xdg-mime default qso-one-url.desktop x-scheme-handler/qsoone || true
+fi
+# Also write the association into mimeapps.list directly — covers setups
+# without xdg-mime and desktops that read a different file than the one
+# xdg-mime happens to write (e.g. ~/.config vs applications/).
+MIMEAPPS="$DESKTOP_DIR/mimeapps.list"
+touch "$MIMEAPPS"
+if grep -q '^x-scheme-handler/qsoone=' "$MIMEAPPS"; then
+  sed -i 's|^x-scheme-handler/qsoone=.*|x-scheme-handler/qsoone=qso-one-url.desktop|' "$MIMEAPPS"
+elif grep -q '^\[Default Applications\]' "$MIMEAPPS"; then
+  sed -i '/^\[Default Applications\]/a x-scheme-handler/qsoone=qso-one-url.desktop' "$MIMEAPPS"
+else
+  printf '[Default Applications]\nx-scheme-handler/qsoone=qso-one-url.desktop\n' >> "$MIMEAPPS"
 fi
 
 update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true

@@ -19,6 +19,8 @@ tested on Arch Linux (Wine 11.20, PipeWire) and Debian 13 trixie
 - **Idle CPU:** works around ~60-70% of a core being burned at idle by
   launching the app with `TZ` set. A "QSO One (TZ fixed)" menu entry is
   created and the Wine-generated "QSO One" entry is hidden.
+- **Web links:** registers a `qsoone://` handler so "open in QSO One"
+  links on the website launch the app under Wine from any browser.
 
 ## Install
 
@@ -61,7 +63,10 @@ rm -f "$APP/mf.dll" "$APP/icu.dll" \
       "$APP/flutter_local_notifications_windows.dll"
 mv "$APP/flutter_local_notifications_windows.dll.disabled" \
    "$APP/flutter_local_notifications_windows.dll"
-rm -f ~/.local/share/applications/qso-one-fixed.desktop
+rm -f ~/.local/share/applications/qso-one-fixed.desktop \
+      ~/.local/share/applications/qso-one-url.desktop
+sed -i '/^x-scheme-handler\/qsoone=qso-one-url\.desktop/d' \
+      ~/.local/share/applications/mimeapps.list 2>/dev/null
 ```
 
 To un-hide the original menu entry, remove the `Hidden=true` line from
