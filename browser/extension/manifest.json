@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "QSO One connect links on Linux (Wine)",
+  "version": "1.0.0",
+  "description": "Makes qso1.net \"Connect ... on QSO One\" buttons fire qsoone:// links on Linux/Wine instead of redirecting to /download.",
+  "content_scripts": [
+    {
+      "matches": ["https://qso1.net/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}

@@ -99,3 +99,108 @@ unrelated entries — including the `qsoone://` protocol handler, which
 must not be hidden.
 Wine re-creates those entries on updates, hence the instruction to
 re-run the installer after every update.
+
+## The website connect buttons
+
+qso1.net's `ConnectButton` click handler sniffs `navigator.userAgent`
+(decompiled from the Next.js chunks):
+
+```js
+const platform = /android/i.test(navigator.userAgent) ? 'android'
+               : /Windows NT/i.test(navigator.userAgent) ? 'windows'
+               : 'other';
+if (platform === 'android') location.href = links.intent;          // intent://...#Intent;scheme=qsoone;...
+else if (platform === 'windows') {
+  let succeeded = false;
+  document.addEventListener('visibilitychange',
+    () => { if (document.hidden) succeeded = true; });
+  window.addEventListener('blur', () => { succeeded = true; }, { once: true });
+  location.href = links.scheme;                                    // qsoone://connect?...
+  setTimeout(() => { if (!succeeded) router.push('/download'); }, 1500);
+} else router.push('/download');                                   // Linux lands here
+```
+
+So on Linux the `qsoone://` scheme is never attempted — the UA gate is
+the whole blocker; the Wine-registered `x-scheme-handler/qsoone` desktop
+entry works as-is (verified: `qso_one.exe` launches with
+`qsoone://connect?v=1&protocol=allstarlink&identifier=569430&...`).
+
+Two details shape the fix:
+
+- The check reads the **JS property** `navigator.userAgent`, not the
+  HTTP header — a UA-spoofing extension that only rewrites request
+  headers (e.g. declarativeNetRequest rules) is not enough. The patch
+  must run in the page's main world.
+- The 1500 ms blur heuristic doesn't fire under Wine (xdg-open and the
+  app don't steal focus from the browser), so even a successful launch
+  ends on `/download`. The script dispatches `window.dispatchEvent(new
+  Event('blur'))`, which truthfully reports "the OS took it" from the
+  site's point of view — a plain `Event` (not `FocusEvent`) is what a
+  real window blur delivers to `window` listeners anyway.
+
+Button matching uses `aria-label`/`title`/`textContent` matching
+`/QSO One/i` because the compact chip variant renders short text like
+"EchoLink 106963" with the full "Connect on ... on QSO One" string only
+in `aria-label` and `title`.
+
+### Applying the fix
+
+The same patch ships two ways under `browser/`; pick one per browser
+profile. Both apply only to qso1.net and take effect on the next page
+load — reload any open qso1.net tab after installing.
+
+**Option 1 — unpacked extension** (no extra dependencies):
+
+1. Open `brave://extensions` (Brave) or `chrome://extensions` (Chrome,
+   Edge, Vivaldi…).
+2. Enable **Developer mode** (top-right toggle).
+3. **Load unpacked** → select the `browser/extension/` directory from
+   this repo.
+4. Reload qso1.net.
+
+Caveat: unpacked extensions trigger the "disable developer mode
+extensions?" prompt on browser start in some Chromium builds; choosing
+**Cancel** keeps the extension. The extension must stay at the path you
+loaded it from — keep the repo cloned rather than copying the folder to
+a temp location.
+
+**Option 2 — userscript** (Tampermonkey, Violentmonkey, Greasemonkey,
+etc.):
+
+1. Install a userscript manager extension.
+2. Open `browser/qso1-connect.user.js` raw — from a clone, open the file
+   in the browser (`file://` URL) and the manager will offer to install
+   it; or create a new script in the manager and paste the file
+   contents. Once this repo is pushed, the raw GitHub URL also works as
+   a one-click install link.
+3. Reload qso1.net.
+
+The script is written to work in both page context (`@grant none`) and
+sandboxed/isolated worlds — in the latter case it also injects itself
+into the page via a `<script>` element, which qso1.net's CSP currently
+permits. If the site ever ships a `Content-Security-Policy` that blocks
+inline scripts, configure your manager to inject into the page context
+directly (Violentmonkey: "Inject into: page"; Tampermonkey: `@grant
+none` already runs in page context).
+
+**Verify:** click a "Connect ... on QSO One" button on
+[Net Finder](https://qso1.net/nets#find-a-net). The browser asks once
+whether to open the external app — allow it (tick "always allow" to skip
+future prompts). QSO One should launch onto the net's connect screen
+while the page stays where it was. If the `/download` fallback still
+fires, check that the patch actually ran in the page world
+(`navigator.userAgent` in DevTools console should report Windows).
+
+**Side effects, both intentional:**
+
+- The `/download` fallback is suppressed entirely. If QSO One isn't
+  actually installed, nothing happens on click — use the "Don't have
+  QSO One? Get it free" link on each net card.
+- qso1.net's download page will offer the Windows build, which is what
+  you want under Wine anyway.
+
+### Removing it
+
+Disable/remove the extension or userscript and reload the page. There
+is no persistent state — the patch only ever modifies the live
+`Navigator.prototype` of loaded qso1.net pages.

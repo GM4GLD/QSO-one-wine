@@ -20,6 +20,10 @@ tested on Arch Linux (Wine 11.20, PipeWire) and Debian 13 trixie
   launching the app with `TZ` set. A "QSO One (TZ fixed)" menu entry is
   created and the Wine-generated "QSO One" entry is hidden.
 
+It also includes a **browser-side fix** for the "Connect ... on QSO One"
+buttons on qso1.net, which otherwise bounce Linux users to the download
+page — see [Browser connect links](#browser-connect-links).
+
 ## Install
 
 **Prerequisite:** install QSO One under Wine first — download the
@@ -72,6 +76,17 @@ regenerate it).
 This restores the original notification plugin and removes the
 microphone shim. It does not affect QSO One's synced data or system
 audio configuration.
+
+## Browser connect links
+
+The "Connect ... on QSO One" buttons on qso1.net only fire the
+`qsoone://` link when `navigator.userAgent` says Windows (Android gets
+an `intent://` URL); Linux browsers are sent straight to `/download`.
+The Wine-installed `qsoone://` handler already works — the site just
+never attempts it. [`browser/`](browser) contains a small page patch,
+installable as a userscript or an unpacked extension, that fixes this.
+See [DEV.md](DEV.md#the-website-connect-buttons) for how it works and
+how to apply it.
 
 ## Notes
 
