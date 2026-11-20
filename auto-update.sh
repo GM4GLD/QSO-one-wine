@@ -63,12 +63,26 @@ temp_dirs() {
   done
 }
 
+# Handled files are recorded as "mtime size path" — not path alone —
+# because the app reuses the same QSOOneSetup_v<ver>.exe name for every
+# download, and a re-downloaded file must count as new. A file still
+# downloading at watcher start is caught the same way: its size keeps
+# changing, so its fingerprint never matches the baseline record.
+fingerprint() {
+  stat -c '%Y %s %n' "$1" 2>/dev/null
+}
+
+mark() {
+  fingerprint "$1" >>"$PROCESSED" 2>/dev/null || true
+}
+
 # Newest not-yet-handled QSOOneSetup_v*.exe, or empty.
 detect() {
   temp_dirs | while IFS= read -r t; do
     find "$t" -maxdepth 1 -name 'QSOOneSetup_v*.exe' -printf '%T@ %p\n' 2>/dev/null
   done | sort -rn | cut -d' ' -f2- | while IFS= read -r f; do
-    grep -qxF "$f" "$PROCESSED" || { printf '%s\n' "$f"; break; }
+    _fp=$(fingerprint "$f") || continue
+    grep -qxF "$_fp" "$PROCESSED" || { printf '%s\n' "$f"; break; }
   done
 }
 
@@ -147,13 +161,13 @@ if [ "${1:-}" = "--now" ]; then
   _f=$(detect)
   if [ -n "$_f" ]; then
     apply "$_f"
-    printf '%s\n' "$_f" >>"$PROCESSED"
+    mark "$_f"
   else
     log "--now: no downloaded installer found"
   fi
 fi
 temp_dirs | while IFS= read -r t; do
-  find "$t" -maxdepth 1 -name 'QSOOneSetup_v*.exe' 2>/dev/null
+  find "$t" -maxdepth 1 -name 'QSOOneSetup_v*.exe' -exec stat -c '%Y %s %n' {} + 2>/dev/null
 done >>"$PROCESSED"
 sort -u -o "$PROCESSED" "$PROCESSED" 2>/dev/null || true
 
@@ -162,7 +176,7 @@ while :; do
   _f=$(detect)
   if [ -n "$_f" ]; then
     apply "$_f"
-    printf '%s\n' "$_f" >>"$PROCESSED"
+    mark "$_f"
   fi
   sleep "$POLL"
 done
