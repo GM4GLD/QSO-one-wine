@@ -13,6 +13,9 @@
 #     with TZ set (works around ~60-70% idle CPU burn under Wine)
 #   * hides the Wine-generated "QSO One" menu entry so only the
 #     TZ-fixed launcher appears
+#   * optionally installs a background auto-update helper (asks first)
+#     that applies QSO One's own updates silently and re-runs this
+#     script afterwards — see auto-update.sh
 #
 # Every QSO One install directory found (including per-user installs
 # under drive_c/users/*) gets the DLLs. Re-run after every update.
@@ -210,4 +213,74 @@ do
 done
 
 update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+
+# --- auto-update helper (opt-in) -------------------------------------------
+#
+# QSO One's own updater downloads QSOOneSetup_vNNN.exe into Wine %TEMP%,
+# then stops working until the update is applied. The optional helper
+# (auto-update.sh) watches for that file, closes QSO One, installs the
+# update silently, re-runs this script, and relaunches via the TZ-fixed
+# launcher.
+#
+# It is never installed without consent: only the prompt is gated, by
+# QSO_WINE_NO_UPDATER=1 (set by the helper when it re-runs this script
+# after an update) and by /dev/tty being readable, so non-interactive
+# runs skip silently. An already-installed helper is refreshed
+# unconditionally — that is how it picks up fixes to itself.
+
+UPD_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/qso-one-wine"
+UPD_BIN="$UPD_DIR/auto-update.sh"
+
+if [ -f "$UPD_BIN" ]; then
+  # Already opted in — refresh the helper to this repo's version.
+  if curl -fsSL "$REPO/auto-update.sh" -o "$UPD_BIN.new" 2>/dev/null; then
+    chmod +x "$UPD_BIN.new"
+    mv "$UPD_BIN.new" "$UPD_BIN"
+    echo "install.sh: auto-update helper refreshed"
+  else
+    rm -f "$UPD_BIN.new"
+  fi
+elif [ -z "${QSO_WINE_NO_UPDATER:-}" ]; then
+  cat <<'EOF'
+
+Optional: auto-update helper
+  QSO One's built-in updater downloads updates by itself but still makes
+  you click through the Windows installer — and the install undoes the
+  Wine fixes applied above. With this helper running you just press
+  Download in the app as usual; when the download finishes it closes
+  QSO One, installs the update silently, re-applies the fixes, and
+  relaunches "QSO One (TZ fixed)". It starts at login via an XDG
+  autostart entry and can be removed any time (see README, "Reverting").
+EOF
+  printf "Install the auto-update helper? [y/N] "
+  read -r ANS 2>/dev/null < /dev/tty || ANS=""
+  case "$ANS" in
+    y|Y|yes|YES|Yes)
+      mkdir -p "$UPD_DIR"
+      if curl -fsSL "$REPO/auto-update.sh" -o "$UPD_BIN" && chmod +x "$UPD_BIN"; then
+        AUTO="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
+        mkdir -p "$AUTO"
+        cat > "$AUTO/qso-one-wine-updater.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=QSO One auto-update helper
+Comment=Applies QSO One updates and Wine fixes unattended
+Exec="$UPD_BIN"
+X-GNOME-Autostart-enabled=true
+EOF
+        setsid "$UPD_BIN" >/dev/null 2>&1 &
+        echo "install.sh: auto-update helper installed and started"
+        echo "  script:    $UPD_BIN"
+        echo "  autostart: $AUTO/qso-one-wine-updater.desktop"
+        echo "  logs:      ${XDG_STATE_HOME:-$HOME/.local/state}/qso-one-wine/auto-update.log"
+      else
+        echo "install.sh: could not download auto-update.sh; skipping" >&2
+      fi
+      ;;
+    *)
+      echo "install.sh: skipped auto-update helper"
+      ;;
+  esac
+fi
+
 echo "install.sh: done. Launch 'QSO One (TZ fixed)' from your menu."

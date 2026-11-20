@@ -40,8 +40,10 @@ It finds your QSO One install (including per-user installs under
 `drive_c/users/*`), places the DLLs next to `qso_one.exe`, writes the
 "QSO One (TZ fixed)" launcher, and hides the default menu entry.
 
-**Re-run it after every QSO One update** — updates are manual installs
-of the latest version and overwrite the DLLs and the menu entry.
+**QSO One updates overwrite the DLLs and the menu entry**, so the fixes
+must be re-applied each time. The installer offers to set up an
+[auto-update helper](#auto-update-helper) that does this for you —
+otherwise re-run the command above after every update.
 
 Then launch **"QSO One (TZ fixed)"** from your app menu.
 
@@ -53,6 +55,36 @@ pactl list source-outputs
 ```
 
 Look for `application.name = "qso_one"`.
+
+## Auto-update helper
+
+QSO One's built-in updater downloads new versions itself — the
+installer lands in the Wine `%TEMP%` folder as `QSOOneSetup_vNNN.exe` —
+but it still makes you click through the Windows installer, and the
+install undoes every fix on this page.
+
+When `install.sh` finishes it asks whether to install the auto-update
+helper (`y` to accept; anything else, or a non-interactive run, skips
+it). If you accept, `auto-update.sh` is copied to
+`~/.local/share/qso-one-wine/` and started now and at every login via
+`~/.config/autostart/qso-one-wine-updater.desktop`.
+
+**You still start the update yourself.** The helper does not check for
+or download updates — it only takes over once the download finishes.
+When QSO One offers an update, press **Download** in the app as usual;
+the moment the file finishes downloading the helper:
+
+1. closes QSO One (it stops working until the update is applied anyway),
+2. runs the NSIS installer silently (`wine QSOOneSetup_vNNN.exe /S`),
+3. re-runs `install.sh` to re-apply all the fixes, and
+4. relaunches QSO One through the "QSO One (TZ fixed)" launcher.
+
+Progress is shown as desktop notifications and logged to
+`~/.local/state/qso-one-wine/auto-update.log`. Installers already
+sitting in `%TEMP%` when the watcher starts are ignored, so an old
+download is never installed over a newer app. To apply a downloaded
+update immediately instead of restarting QSO One yourself, run
+`~/.local/share/qso-one-wine/auto-update.sh --now`.
 
 ## Reverting
 
@@ -66,6 +98,14 @@ rm -f "$APP/mf.dll" "$APP/icu.dll" \
 mv "$APP/flutter_local_notifications_windows.dll.disabled" \
    "$APP/flutter_local_notifications_windows.dll"
 rm -f ~/.local/share/applications/qso-one-fixed.desktop
+```
+
+If you opted into the auto-update helper, also run:
+
+```bash
+pkill -f qso-one-wine/auto-update.sh   # stop the running watcher
+rm -f ~/.config/autostart/qso-one-wine-updater.desktop
+rm -rf ~/.local/share/qso-one-wine ~/.local/state/qso-one-wine
 ```
 
 To un-hide the original menu entry, remove the `Hidden=true` line from
